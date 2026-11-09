@@ -1,0 +1,10 @@
+{
+  "name": "بوصلة · Bosla",
+  "short_name": "Bosla",
+  "description": "Independent Thanaweya Amma 2026 analytics",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f5f1",
+  "theme_color": "#1f5fbf",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

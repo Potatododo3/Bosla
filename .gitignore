@@ -1,0 +1,11 @@
+node_modules
+dist
+*.log
+*.zip
+/shots
+
+# Student results must never be committed
+/data-private
+*.csv
+*.xlsx
+*.db

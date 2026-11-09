@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="بوصلة — منصة مستقلة لتحليل نتائج الثانوية العامة 2026: موقعك بين الدفعة، توزيع الدرجات، وتقديرات غير رسمية لحدود القبول. Bosla — independent Thanaweya Amma 2026 analytics." />
+    <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101010" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>بوصلة · Bosla</title>
+    <script>
+      // Apply saved language + theme before first paint (no flash).
+      (function () {
+        try {
+          var d = document.documentElement;
+          var q = new URLSearchParams(location.search).get("lang");
+          var l = q === "en" || q === "ar" ? q : localStorage.getItem("bosla.lang");
+          if (l === "en") { d.lang = "en"; d.dir = "ltr"; }
+          var t = localStorage.getItem("bosla.theme");
+          if (t === "light" || t === "dark") d.dataset.theme = t;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>This application needs JavaScript. / يحتاج هذا التطبيق إلى تفعيل JavaScript.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

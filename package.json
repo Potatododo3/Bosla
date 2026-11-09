@@ -1,0 +1,33 @@
+{
+  "name": "bosla",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Bosla — an independent, bilingual analytics companion for Thanaweya Amma 2026 results.",
+  "scripts": {
+    "dev": "concurrently -k \"npm:api\" \"vite\"",
+    "api": "tsx server/serve.ts --api-only",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server/serve.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "node e2e/run.cjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/readex-pro": "^5.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^10.0.7",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.6",
+    "vitest": "^3.2.7"
+  }
+}

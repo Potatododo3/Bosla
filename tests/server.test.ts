@@ -50,7 +50,7 @@ describe("dataset pipeline", () => {
     expect(s(1000003).national_rank).toBe(2);
     expect(s(1000002).percentile).toBeCloseTo((5 / 6) * 100, 4);
     expect(s(2000001).national_rank).toBe(4);
-    expect(s(1000004)).toMatchObject({ national_rank: 5, percentage: 47.0313, grade_band: "lt50" });
+    expect(s(1000004)).toMatchObject({ national_rank: 5, percentage: 47.0312, grade_band: "lt50" });
     expect(s(1000005).national_rank).toBe(6);
     // absent + withheld are kept but unranked
     expect(s(1000006)).toMatchObject({ national_rank: null, percentile: null, performance_index: null });

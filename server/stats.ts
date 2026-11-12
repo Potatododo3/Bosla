@@ -1,4 +1,3 @@
-// DRAFT — part of docs/NEXT-YEAR-PLAN.md step 2. Not wired into the app and not yet tested.
 /**
  * Numerical routines used by the data build. Each one reproduces the
  * definition used by numpy / scipy in the reference pipeline, so a rebuild

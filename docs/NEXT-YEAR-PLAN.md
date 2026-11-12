@@ -1,7 +1,23 @@
 # Plan: make Bosla work with next year's results
 
-**Status:** planned, not started (except a draft of `server/stats.ts`, see step 2). Owner's answers recorded below; waiting for the owner's go-ahead.
+**Status:** in progress — see the progress list below.
 **Goal:** when next year's results CSV arrives, one command recalculates every number on the site, and admission cutoffs come from a file the owner edits by hand.
+
+## Progress
+
+- [x] **Step 2 — statistics engine** (`server/stats.ts`): checked against numpy/scipy on identical data.
+- [x] **Step 3 — dataset refactor** (`server/dataset.ts`): max score, all rows kept, cleaning log, numpy rounding.
+- [x] **Step 4 — analytics + quality builder** (`server/analytics.ts`).
+- [x] **Step 5 — `npm run build-data`** (`server/build-data.ts`, `server/compare.ts`), including `--compare` and `--hide-names`.
+- [x] **Step 9 (part) — build tests** (`tests/build-data.test.ts`): matches the reference Python pipeline on synthetic files (≈5,500 and ≈6,200 values, every student's rank) and reproduces the published 2026 figures for the real 884,661-student cohort.
+- [ ] **Step 1 — `meta.year` / `meta.max_score` in the shipped data** and read by the site.
+- [ ] **Step 6 — `config/admission.json`** + validator; rewrite admission pages around official minimums; "not published yet" state.
+- [ ] **Step 7 — remove hard-coded 2026 facts** from the UI text and code (`MAX_SCORE`, counts, year).
+- [ ] **Step 8 — server** reads max score from the data and warns when the CSV and the statistics disagree.
+- [ ] **Step 9 (rest)** — admission config tests; update unit, API and browser tests.
+- [ ] **Step 10 — README "Every year" section**; Methodology page lists the three deliberate differences.
+
+Known, intended differences from the reference build: per-status shapes exclude withheld (zero) scores; clusters are the exact optimum over all students; density curves use all students; Anderson–Darling critical values follow the reference's older scipy table.
 
 ## What the owner will do next year (target workflow)
 

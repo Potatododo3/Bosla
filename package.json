@@ -9,6 +9,7 @@
     "api": "tsx server/serve.ts --api-only",
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/serve.ts",
+    "build-data": "tsx server/build-data.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "node e2e/run.cjs"

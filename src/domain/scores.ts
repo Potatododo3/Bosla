@@ -2,6 +2,7 @@
  * Core score rules for the 2026 "new system" results.
  * Pure functions only — no UI, no I/O. Every rule here has unit tests.
  */
+/** Default maximum total. The real value for a results year comes from the generated data (meta.max_score). */
 export const MAX_SCORE = 320;
 
 export type BandKey = "ge95" | "b90_95" | "b80_90" | "b70_80" | "b60_70" | "b50_60" | "lt50";
@@ -19,12 +20,12 @@ export const GRADE_BANDS: ReadonlyArray<{ key: BandKey; low: number; high: numbe
 ];
 
 /** percentage = score ÷ 320 × 100 (exact; no rounding here). */
-export function percentageOf(score: number): number {
-  return (score / MAX_SCORE) * 100;
+export function percentageOf(score: number, max: number = MAX_SCORE): number {
+  return (score / max) * 100;
 }
 
-export function scoreOfPercentage(pct: number): number {
-  return (pct / 100) * MAX_SCORE;
+export function scoreOfPercentage(pct: number, max: number = MAX_SCORE): number {
+  return (pct / 100) * max;
 }
 
 export function gradeBand(pct: number): BandKey {

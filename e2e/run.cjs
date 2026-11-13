@@ -8,7 +8,7 @@ const path = require("path");
 const { execFileSync } = require("child_process");
 
 const BASE = process.env.BASE || "http://127.0.0.1:8787";
-const ROUTES = ["/", "/standing", "/admission", "/predictions", "/search", "/overview", "/distribution", "/top", "/stats", "/quality", "/about", "/methodology", "/faq"];
+const ROUTES = ["/", "/standing", "/admission", "/minimums", "/search", "/overview", "/distribution", "/top", "/stats", "/quality", "/about", "/methodology", "/faq"];
 let pass = 0;
 const fails = [];
 const check = (name, cond, extra = "") => { if (cond) pass++; else { fails.push(`${name} ${extra}`); console.log("  ✗", name, extra); } };
@@ -23,6 +23,18 @@ async function newPage(browser, { lang = "ar", theme = "light", width = 1280, he
   return page;
 }
 const go = (page, p) => page.goto(BASE + p, { waitUntil: "networkidle" });
+
+// A published admission file (invented numbers) for tests; the shipped file is unpublished.
+const PUBLISHED = {
+  year: 2026, published: true, label_ar: "الحد الأدنى للمرحلة الأولى (اختبار)", label_en: "First-phase minimums (test data)", source: "https://example.org/tansiq", updated: "2026-08-01",
+  faculties: [
+    { key: "medicine", name_ar: "الطب البشري", name_en: "Medicine", track: "science", cutoff: 95 },
+    { key: "pharmacy", name_ar: "الصيدلة", name_en: "Pharmacy", track: "science", cutoff: 90.5 },
+    { key: "engineering", name_ar: "الهندسة", name_en: "Engineering", track: "math", cutoff: 90 },
+    { key: "commerce", name_ar: "التجارة", name_en: "Commerce", track: "literary", cutoff: 60 },
+  ],
+};
+const publish = (page, cfg = PUBLISHED) => page.route("**/data/admission.json", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(cfg) }));
 const text = (page, sel) => page.locator(sel).first().innerText();
 
 (async () => {
@@ -57,6 +69,7 @@ const text = (page, sel) => page.locator(sel).first().innerText();
   console.log("2. where do I stand");
   {
     const page = await newPage(browser, { lang: "en" });
+    await publish(page);
     await go(page, "/standing");
     const score = page.getByLabel("Total score"), pct = page.getByLabel("Percentage");
     check("empty state shown first", await page.locator(".state").count() === 1);
@@ -108,31 +121,91 @@ const text = (page, sel) => page.locator(sel).first().innerText();
     await page.context().close();
   }
 
-  console.log("4. admission explorer + estimates");
+  console.log("4. admission: official minimums");
+  {
+    // 4a. as shipped: nothing published → no admission number anywhere
+    const page = await newPage(browser, { lang: "en" });
+    for (const r of ["/admission", "/minimums"]) {
+      await go(page, r);
+      check(`${r}: 'not published yet' state`, await page.getByRole("heading", { name: "Official minimums for 2026 have not been published yet" }).isVisible());
+      check(`${r}: no percentages or tables shown`, await page.locator("table, .fac-num, .outlook, #pct-range").count() === 0);
+    }
+    await go(page, "/predictions");
+    check("old /predictions link redirects to /minimums", page.url().endsWith("/minimums"));
+    await go(page, "/");
+    check("home card says not published", await page.locator('[data-testid="admission-pending"]').count() === 1);
+    await go(page, "/standing");
+    await page.getByLabel("Total score").fill("300");
+    check("standing card says not published, no outlook list", await page.locator('[data-testid="admission-pending"]').count() === 1 && await page.locator(".outlook").count() === 0);
+    check("no errors", page.errors.length === 0, page.errors.join("|"));
+    await page.context().close();
+
+    // 4b. published for the right year
+    const p2 = await newPage(browser, { lang: "en" });
+    await publish(p2);
+    await go(p2, "/admission");
+    check("label + source link shown", await p2.getByText("First-phase minimums (test data)").isVisible() && (await p2.getByRole("link", { name: "Official source" }).getAttribute("href")) === "https://example.org/tansiq");
+    check("hint before input", await p2.getByText("Enter a percentage above").isVisible());
+    await p2.getByLabel("Percentage", { exact: true }).fill("90");
+    const counts = await p2.evaluate(() => Object.fromEntries(["above", "close", "below"].map((k) => [k, document.querySelectorAll(`[data-outlook="${k}"]`).length])));
+    check("90% → meets 2, within a point 1, below 1", JSON.stringify(counts) === '{"above":2,"close":1,"below":1}', JSON.stringify(counts));
+    check("summary sentence", (await text(p2, '[data-testid="outlook-summary"]')) === "Your percentage meets the official minimum for 2 of 4 faculties.");
+    check("slider follows input", (await p2.locator("#pct-range").inputValue()) === "90");
+    await p2.locator("#pct-range").fill("95.5");
+    check("input follows slider", (await p2.getByLabel("Percentage", { exact: true }).inputValue()) === "95.5");
+    check("95.5% → meets all 4", await p2.locator('[data-outlook="above"]').count() === 4);
+    const rows = await p2.locator("table.table tbody tr").allInnerTexts();
+    check("table sorted by minimum, 4 rows", rows.length === 4 && rows[0].includes("Medicine") && rows[3].includes("Commerce"));
+    check("Engineering 90%: total needed 288 / 320 and 42,889 students at or above", rows[2].includes("288.0 / 320") && rows[2].includes("42,889") && rows[2].includes("4.85%"), rows[2]);
+    await go(p2, "/minimums");
+    const med = p2.locator('[data-faculty="medicine"]');
+    check("minimums page: Medicine 95.00%, 304 / 320, 10,327 students", (await med.innerText()).replace(/\s+/g, " ").includes("95.00%") && (await med.innerText()).includes("304.0 / 320") && (await med.innerText()).includes("10,327"), (await med.innerText()).replace(/\s+/g, " "));
+    check("official badge shown", await p2.getByText("Official minimums", { exact: true }).first().isVisible());
+    await go(p2, "/");
+    check("home lists highest official minimums", (await p2.locator(".barlist li").first().innerText()).includes("Medicine"));
+    await p2.getByRole("button", { name: "Switch to Arabic" }).click();
+    check("faculty names follow the language", (await p2.locator(".barlist li").first().innerText()).includes("الطب البشري"));
+    check("no errors", p2.errors.length === 0, p2.errors.join("|"));
+    await p2.context().close();
+
+    // 4c. file for another year → refused
+    const p3 = await newPage(browser, { lang: "en" });
+    await publish(p3, { ...PUBLISHED, year: 2025 });
+    await go(p3, "/minimums");
+    check("wrong-year file is not shown", await p3.getByText("The admission figures on file are for 2025, not 2026, so they are not shown.").isVisible() && await p3.locator(".fac-num").count() === 0);
+    // 4d. malformed file → treated as not published, page still works
+    const p4 = await newPage(browser, { lang: "en" });
+    await publish(p4, { year: 2026, published: true, faculties: [{ key: "x", cutoff: 150 }] });
+    await go(p4, "/admission");
+    check("malformed file falls back to 'not published'", await p4.locator('[data-testid="admission-pending"]').count() === 1 && p4.errors.length === 0, p4.errors.join("|"));
+    await p3.context().close(); await p4.context().close();
+  }
+
+  console.log("4e. another results year and maximum total");
   {
     const page = await newPage(browser, { lang: "en" });
+    const real = await (await fetch(BASE + "/data/analytics.json")).json();
+    real.meta = { ...real.meta, year: 2027, max_score: 400 };
+    real.frequency_table = real.frequency_table.map((r) => ({ ...r, score: r.score * 1.25 }));
+    real.stats_score = { ...real.stats_score, mean: real.stats_score.mean * 1.25, std: real.stats_score.std * 1.25, mode: real.stats_score.mode * 1.25 };
+    await page.route("**/data/analytics.json", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(real) }));
+    await go(page, "/");
+    check("home title uses the data's year", (await text(page, "h1")).includes("2027") && !(await page.locator("#content").innerText()).includes("2026"));
+    check("quick form uses the data's maximum", await page.getByLabel("Your total out of 400").count() === 1);
+    await go(page, "/standing");
+    const score = page.getByLabel("Total score");
+    await score.fill("400");
+    check("400/400 → 100%, rank 1", (await page.getByLabel("Percentage").inputValue()) === "100" && (await text(page, '[data-testid="rank"]')) === "1");
+    await score.fill("358");
+    check("358/400 = 89.5% ranks like 286.4/320", (await page.getByLabel("Percentage").inputValue()) === "89.5");
+    await score.fill("401");
+    check("401 rejected with the right maximum", await page.getByText("The total can't exceed 400.").isVisible());
+    await go(page, "/faq");
+    check("FAQ wording follows year and maximum", await page.getByRole("button", { name: "Why is the total out of 400?" }).count() === 1 && await page.getByRole("button", { name: "Which year am I looking at?" }).count() === 1);
     await go(page, "/admission");
-    check("hint before input", await page.getByText("Enter a percentage above").isVisible());
-    await page.getByLabel("Percentage", { exact: true }).fill("90");
-    const counts = await page.evaluate(() => Object.fromEntries(["likely", "expected", "borderline", "below"].map((k) => [k, document.querySelectorAll(`[data-outlook="${k}"]`).length])));
-    check("90% → 11 likely, 1 borderline, 2 below", JSON.stringify(counts) === '{"likely":11,"expected":0,"borderline":1,"below":2}', JSON.stringify(counts));
-    await page.getByLabel("Percentage", { exact: true }).fill("88.88");
-    check("88.88% → engineering is exactly 'around the estimate'", await page.locator('[data-outlook="expected"]').count() === 1);
-    await page.getByLabel("Percentage", { exact: true }).fill("90");
-    check("slider follows input", (await page.locator("#pct-range").inputValue()) === "90");
-    await page.locator("#pct-range").fill("95.5");
-    check("input follows slider", (await page.getByLabel("Percentage", { exact: true }).inputValue()) === "95.5");
-    check("95.5% → all 14 likely", await page.locator('[data-outlook="likely"]').count() === 14);
-    await page.selectOption("#fac-select", "law");
-    check("trend chart updates for Law", (await page.locator(".chart svg").last().getAttribute("aria-label")).includes("63.3"));
-    check("faculty table has 14 rows", await page.locator("table.table tbody tr").count() === 14);
-    await go(page, "/predictions");
-    const med = page.locator('[data-faculty="medicine"]');
-    check("medicine central estimate 94.5%", (await med.locator(".fac-num").innerText()).replace(/\s/g, "") === "94.5%");
-    await med.locator("summary").click();
-    const bd = await med.locator("details").innerText();
-    check("breakdown shows trend, pressure, calibration, total", bd.includes("89.64%") && bd.includes("−1.19") && bd.includes("+6.00") && bd.includes("94.45%"), bd.replace(/\n/g, " "));
-    check("unofficial banner present", await page.getByText("not official coordination-office results").first().isVisible());
+    check("2026 admission file refused for 2027 results", await page.getByRole("heading", { name: "Official minimums for 2027 have not been published yet" }).isVisible() && await page.getByText("are for 2026, not 2027").isVisible());
+    await go(page, "/about");
+    check("About shows what data is loaded", (await text(page, '[data-testid="about-data"]')).startsWith("2027 ·"));
     check("no errors", page.errors.length === 0, page.errors.join("|"));
     await page.context().close();
   }
@@ -218,9 +291,9 @@ const text = (page, sel) => page.locator(sel).first().innerText();
     await page.reload({ waitUntil: "networkidle" });
     check("theme persists across reload", (await page.evaluate(() => document.documentElement.dataset.theme)) === "dark");
     check("deep link survives refresh", (await text(page, "h1")) === "Frequently asked questions");
-    const b = page.getByRole("button", { name: "Are the admission cutoffs official?" });
+    const b = page.getByRole("button", { name: "Are the admission minimums official?" });
     await b.click();
-    check("FAQ accordion opens", (await b.getAttribute("aria-expanded")) === "true" && await page.getByText("They are statistical estimates").isVisible());
+    check("FAQ accordion opens", (await b.getAttribute("aria-expanded")) === "true" && await page.getByText("They are the ministry's published figures").isVisible());
     await page.getByRole("button", { name: "Menu" }).click();
     check("mobile drawer opens", await page.locator(".sidebar.open").count() === 1);
     await page.keyboard.press("Escape");

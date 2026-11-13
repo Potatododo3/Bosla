@@ -1,6 +1,6 @@
 # Plan: make Bosla work with next year's results
 
-**Status:** in progress — see the progress list below.
+**Status:** complete. The yearly steps for the owner are in the README ("Every year: new results").
 **Goal:** when next year's results CSV arrives, one command recalculates every number on the site, and admission cutoffs come from a file the owner edits by hand.
 
 ## Progress
@@ -15,8 +15,8 @@
 - [x] **Step 7 — remove hard-coded 2026 facts** from the UI text and code (`MAX_SCORE`, counts, year), both languages.
 - [x] **Step 8 — server** reads max score from the data and warns when the CSV and the statistics disagree.
 - [x] **Step 9 (unit)** — admission config tests; unit and translation tests updated (44 pass).
-- [ ] **Step 9 (browser)** — update `e2e/run.cjs` for the new admission pages, the pending state, a published config and a different year / maximum; visual check.
-- [ ] **Step 10 — README "Every year" section**; Methodology page lists the three deliberate differences.
+- [x] **Step 9 (browser)** — `e2e/run.cjs` covers the pending state, a published file, wrong-year and malformed files, and a different year / maximum (727 checks pass). Full dress rehearsal with a synthetic 2027 file passed.
+- [x] **Step 10 — README "Every year" section**; Methodology page lists the deliberate differences.
 
 Known, intended differences from the reference build: per-status shapes exclude withheld (zero) scores; clusters are the exact optimum over all students; density curves use all students; Anderson–Darling critical values follow the reference's older scipy table.
 

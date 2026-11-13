@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { useCore } from "./data/store.tsx";
 import { useI18n } from "./i18n/index.tsx";
 import { Icon, Loading } from "./components/ui.tsx";
@@ -162,6 +163,7 @@ export function App() {
           <span>{t.home.trust1}</span>
         </footer>
       </div>
+      <Analytics />
     </div>
   );
 }

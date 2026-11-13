@@ -87,13 +87,13 @@ export function Note({ tone = "info", children, title }: { tone?: "info" | "warn
   );
 }
 
-export function UnofficialBadge() {
+export function OfficialBadge() {
   const { t } = useI18n();
-  return <span className="badge badge-warn"><Icon name="alert" size={14} />{t.ui.unofficial}</span>;
+  return <span className="badge badge-info"><Icon name="check" size={14} />{t.adm.badge}</span>;
 }
-export function YearBadge() {
+export function YearBadge({ year }: { year: number }) {
   const { t } = useI18n();
-  return <span className="badge">{t.ui.dataYear}</span>;
+  return <span className="badge">{t.ui.dataYear(String(year))}</span>;
 }
 
 const STATUS_TONE: Record<StatusKey, string> = { pass_r1: "good", round2: "warn", fail_r1: "bad", absent: "mute", unknown: "mute" };

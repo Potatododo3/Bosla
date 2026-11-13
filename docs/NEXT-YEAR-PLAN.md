@@ -10,11 +10,12 @@
 - [x] **Step 4 — analytics + quality builder** (`server/analytics.ts`).
 - [x] **Step 5 — `npm run build-data`** (`server/build-data.ts`, `server/compare.ts`), including `--compare` and `--hide-names`.
 - [x] **Step 9 (part) — build tests** (`tests/build-data.test.ts`): matches the reference Python pipeline on synthetic files (≈5,500 and ≈6,200 values, every student's rank) and reproduces the published 2026 figures for the real 884,661-student cohort.
-- [ ] **Step 1 — `meta.year` / `meta.max_score` in the shipped data** and read by the site.
-- [ ] **Step 6 — `config/admission.json`** + validator; rewrite admission pages around official minimums; "not published yet" state.
-- [ ] **Step 7 — remove hard-coded 2026 facts** from the UI text and code (`MAX_SCORE`, counts, year).
-- [ ] **Step 8 — server** reads max score from the data and warns when the CSV and the statistics disagree.
-- [ ] **Step 9 (rest)** — admission config tests; update unit, API and browser tests.
+- [x] **Step 1 — `meta.year` / `meta.max_score` in the shipped data** and read by the site.
+- [x] **Step 6 — `config/admission.json`** + validator (`src/domain/admissionConfig.ts`, `server/prepare-admission.ts`); admission pages rewritten around official minimums; "not published yet" state. Prediction model removed.
+- [x] **Step 7 — remove hard-coded 2026 facts** from the UI text and code (`MAX_SCORE`, counts, year), both languages.
+- [x] **Step 8 — server** reads max score from the data and warns when the CSV and the statistics disagree.
+- [x] **Step 9 (unit)** — admission config tests; unit and translation tests updated (44 pass).
+- [ ] **Step 9 (browser)** — update `e2e/run.cjs` for the new admission pages, the pending state, a published config and a different year / maximum; visual check.
 - [ ] **Step 10 — README "Every year" section**; Methodology page lists the three deliberate differences.
 
 Known, intended differences from the reference build: per-status shapes exclude withheld (zero) scores; clusters are the exact optimum over all students; density curves use all students; Anderson–Darling critical values follow the reference's older scipy table.

@@ -1,0 +1,24 @@
+{
+  "year": 2026,
+  "published": false,
+  "label_ar": "",
+  "label_en": "",
+  "source": "",
+  "updated": "",
+  "faculties": [
+    { "key": "medicine", "name_ar": "الطب البشري", "name_en": "Medicine", "track": "science", "cutoff": null },
+    { "key": "dentistry", "name_ar": "طب الأسنان", "name_en": "Dentistry", "track": "science", "cutoff": null },
+    { "key": "pharmacy", "name_ar": "الصيدلة", "name_en": "Pharmacy", "track": "science", "cutoff": null },
+    { "key": "vet", "name_ar": "الطب البيطري", "name_en": "Veterinary Medicine", "track": "science", "cutoff": null },
+    { "key": "engineering", "name_ar": "الهندسة", "name_en": "Engineering", "track": "math", "cutoff": null },
+    { "key": "computer_science", "name_ar": "الحاسبات والمعلومات", "name_en": "Computers & Information", "track": "math", "cutoff": null },
+    { "key": "ai", "name_ar": "الذكاء الاصطناعي", "name_en": "Artificial Intelligence", "track": "math", "cutoff": null },
+    { "key": "nursing", "name_ar": "التمريض", "name_en": "Nursing", "track": "science", "cutoff": null },
+    { "key": "science", "name_ar": "العلوم", "name_en": "Science", "track": "science", "cutoff": null },
+    { "key": "agriculture", "name_ar": "الزراعة", "name_en": "Agriculture", "track": "science", "cutoff": null },
+    { "key": "commerce", "name_ar": "التجارة", "name_en": "Commerce", "track": "literary", "cutoff": null },
+    { "key": "law", "name_ar": "الحقوق", "name_en": "Law", "track": "literary", "cutoff": null },
+    { "key": "arts", "name_ar": "الآداب", "name_en": "Arts", "track": "literary", "cutoff": null },
+    { "key": "education", "name_ar": "التربية", "name_en": "Education", "track": "mixed", "cutoff": null }
+  ]
+}

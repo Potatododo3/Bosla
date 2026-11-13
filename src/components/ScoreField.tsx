@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { useScore } from "../data/store.tsx";
-import { MAX_SCORE, parseNumberInput, percentageOf, round, scoreOfPercentage, type ScoreError } from "../domain/scores.ts";
+import { parseNumberInput, percentageOf, round, scoreOfPercentage, type ScoreError } from "../domain/scores.ts";
 import { Icon } from "./ui.tsx";
 
 const show = (v: number) => String(round(v, 2));
@@ -11,11 +11,11 @@ const show = (v: number) => String(round(v, 2));
  * Text is kept as typed (so a language switch never discards input) and the
  * shared score only updates when the value is valid.
  */
-export function ScoreFields({ only }: { only?: "pct" }) {
-  const { t } = useI18n();
+export function ScoreFields({ only, max }: { only?: "pct"; max: number }) {
+  const { t, n } = useI18n();
   const { score, setScore } = useScore();
   const [sText, setSText] = useState(() => (score === null ? "" : show(score)));
-  const [pText, setPText] = useState(() => (score === null ? "" : show(percentageOf(score))));
+  const [pText, setPText] = useState(() => (score === null ? "" : show(percentageOf(score, max))));
   const [sErr, setSErr] = useState<ScoreError | null>(null);
   const [pErr, setPErr] = useState<ScoreError | null>(null);
   const ids = { s: useId(), p: useId(), sh: useId(), ph: useId() };
@@ -23,25 +23,25 @@ export function ScoreFields({ only }: { only?: "pct" }) {
   // Another control (e.g. the slider) changed the shared score.
   useEffect(() => {
     if (score === null) return;
-    setSText((cur) => { const p = parseNumberInput(cur, 0, MAX_SCORE); return p.ok && Math.abs(p.value - score) < 1e-9 ? cur : show(score); });
-    setPText((cur) => { const p = parseNumberInput(cur, 0, 100); return p.ok && Math.abs(scoreOfPercentage(p.value) - score) < 1e-9 ? cur : show(percentageOf(score)); });
+    setSText((cur) => { const p = parseNumberInput(cur, 0, max); return p.ok && Math.abs(p.value - score) < 1e-9 ? cur : show(score); });
+    setPText((cur) => { const p = parseNumberInput(cur, 0, 100); return p.ok && Math.abs(scoreOfPercentage(p.value, max) - score) < 1e-9 ? cur : show(percentageOf(score, max)); });
     setSErr(null); setPErr(null);
-  }, [score]);
+  }, [score, max]);
 
   const onScore = (raw: string) => {
     setSText(raw); setPErr(null);
-    const p = parseNumberInput(raw, 0, MAX_SCORE);
-    if (p.ok) { setSErr(null); setPText(show(percentageOf(p.value))); setScore(p.value); }
+    const p = parseNumberInput(raw, 0, max);
+    if (p.ok) { setSErr(null); setPText(show(percentageOf(p.value, max))); setScore(p.value); }
     else { setSErr(p.error === "empty" ? null : p.error); setPText(""); setScore(null); }
   };
   const onPct = (raw: string) => {
     setPText(raw); setSErr(null);
     const p = parseNumberInput(raw, 0, 100);
-    if (p.ok) { setPErr(null); const s = scoreOfPercentage(p.value); setSText(show(s)); setScore(s); }
+    if (p.ok) { setPErr(null); const s = scoreOfPercentage(p.value, max); setSText(show(s)); setScore(s); }
     else { setPErr(p.error === "empty" ? null : p.error); setSText(""); setScore(null); }
   };
   const msg = (e: ScoreError, kind: "score" | "pct") =>
-    e === "above_max" ? (kind === "score" ? t.standing.errors.above_max_score : t.standing.errors.above_max_pct) : t.standing.errors[e];
+    e === "above_max" ? (kind === "score" ? t.standing.errors.above_max_score(n(max)) : t.standing.errors.above_max_pct) : t.standing.errors[e];
 
   const pct = (
     <div className="field">
@@ -61,7 +61,7 @@ export function ScoreFields({ only }: { only?: "pct" }) {
         <input id={ids.s} className="input" inputMode="decimal" autoComplete="off" dir="ltr" value={sText} placeholder="286.5"
           aria-invalid={sErr !== null} aria-describedby={ids.sh} onChange={(e) => onScore(e.target.value)} />
         <div id={ids.sh} aria-live="polite">
-          {sErr ? <span className="err"><Icon name="alert" size={15} />{msg(sErr, "score")}</span> : <span className="hint">{t.standing.scoreHint}</span>}
+          {sErr ? <span className="err"><Icon name="alert" size={15} />{msg(sErr, "score")}</span> : <span className="hint">{t.standing.scoreHint(n(max))}</span>}
         </div>
       </div>
       {pct}

@@ -1,23 +1,30 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useI18n } from "../i18n/index.tsx";
-import { useCore, useScore } from "../data/store.tsx";
-import { MAX_SCORE, parseNumberInput } from "../domain/scores.ts";
-import { Card, Icon, Ready, Stat, UnofficialBadge } from "../components/ui.tsx";
+import { useCore, useScore, type Core } from "../data/store.tsx";
+import { parseNumberInput } from "../domain/scores.ts";
+import { Card, Icon, OfficialBadge, Ready, Stat } from "../components/ui.tsx";
 import { BarList } from "../charts/Parts.tsx";
+import { Pending, useFacultyName } from "./Admission.tsx";
 
 export function Home() {
-  const { t, n, f } = useI18n();
   const core = useCore();
+  return <div className="page"><Ready of={core}>{(c) => <HomeBody core={c} />}</Ready></div>;
+}
+
+function HomeBody({ core }: { core: Core }) {
+  const { t, n, f } = useI18n();
+  const { a, year, max, admission } = core;
   const { setScore } = useScore();
+  const name = useFacultyName();
   const nav = useNavigate();
   const [text, setText] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const p = parseNumberInput(text, 0, MAX_SCORE);
-    if (!p.ok) { setErr(p.error === "above_max" ? t.standing.errors.above_max_score : t.standing.errors[p.error]); return; }
+    const p = parseNumberInput(text, 0, max);
+    if (!p.ok) { setErr(p.error === "above_max" ? t.standing.errors.above_max_score(n(max)) : t.standing.errors[p.error]); return; }
     setScore(p.value);
     nav("/standing");
   }
@@ -30,12 +37,12 @@ export function Home() {
   ];
 
   return (
-    <div className="page">
+    <>
       <section className="hero">
         <div>
           <span className="badge">{t.home.eyebrow}</span>
-          <h1>{t.home.title}</h1>
-          <p className="lead">{t.home.lead}</p>
+          <h1>{t.home.title(String(year))}</h1>
+          <p className="lead">{t.home.lead(n(a.cohort.sitters))}</p>
           <div className="hero-actions">
             <Link className="btn primary" to="/standing">{t.home.ctaStanding}<Icon name="arrow" flip /></Link>
             <Link className="btn" to="/overview">{t.home.ctaDashboard}</Link>
@@ -43,8 +50,8 @@ export function Home() {
         </div>
         <form className="quick" onSubmit={submit} noValidate>
           <div className="field">
-            <label htmlFor="quick-score">{t.home.quickLabel}</label>
-            <input id="quick-score" className="input" inputMode="decimal" autoComplete="off" dir="ltr" placeholder="286.5" value={text}
+            <label htmlFor="quick-score">{t.home.quickLabel(n(max))}</label>
+            <input id="quick-score" className="input" inputMode="decimal" autoComplete="off" dir="ltr" placeholder={String(Math.round(max * 0.895 * 2) / 2)} value={text}
               aria-invalid={err !== null} aria-describedby="quick-msg" onChange={(e) => { setText(e.target.value); setErr(null); }} />
             <div id="quick-msg" aria-live="polite">
               {err ? <span className="err"><Icon name="alert" size={15} />{err}</span> : <span className="hint">{t.standing.privacy}</span>}
@@ -54,40 +61,36 @@ export function Home() {
         </form>
       </section>
 
-      <Ready of={core}>
-        {({ a, faculties }) => (
-          <>
-            <div className="grid g4">
-              <Stat label={t.home.kTotal} value={n(a.cohort.total_students)} />
-              <Stat label={t.home.kRanked} value={n(a.cohort.sitters)} />
-              <Stat label={t.home.kMean} value={f(a.stats_pct.mean, 1)} unit="%" />
-              <Stat label={t.home.kFaculties} value={n(faculties.length)} />
-            </div>
-            <div className="grid g2">
-              {features.map((x) => (
-                <Link key={x.to} to={x.to} className="feature">
-                  <span className="ficon"><Icon name={x.icon} size={20} /></span>
-                  <div><h3>{x.title}</h3><p>{x.desc}</p></div>
-                </Link>
-              ))}
-            </div>
-            <div className="grid g2">
-              <Card title={t.home.topCutoffs} right={<UnofficialBadge />}>
-                <BarList max={100} rows={faculties.slice(0, 6).map((x) => ({
-                  key: x.key, label: t.faculty[x.key] ?? x.key, value: x.expected, display: `${f(x.expected, 1)}%`, note: t.overview.needs(f(x.scoreNeeded, 0)),
-                }))} />
-                <p style={{ marginTop: 12 }}><Link to="/predictions">{t.ui.viewAll}</Link></p>
-              </Card>
-              <Card title={t.home.trustT}>
-                <ul className="list">
-                  <li>{t.home.trust1}</li><li>{t.home.trust2}</li><li>{t.home.trust3}</li>
-                </ul>
-                <p style={{ marginTop: 12 }}><Link to="/methodology">{t.nav.methodology}</Link></p>
-              </Card>
-            </div>
-          </>
-        )}
-      </Ready>
-    </div>
+      <div className="grid g4">
+        <Stat label={t.home.kTotal} value={n(a.cohort.total_students)} />
+        <Stat label={t.home.kRanked} value={n(a.cohort.sitters)} />
+        <Stat label={t.home.kMean} value={f(a.stats_pct.mean, 1)} unit="%" />
+        <Stat label={t.home.kMax} value={n(max)} />
+      </div>
+      <div className="grid g2">
+        {features.map((x) => (
+          <Link key={x.to} to={x.to} className="feature">
+            <span className="ficon"><Icon name={x.icon} size={20} /></span>
+            <div><h3>{x.title}</h3><p>{x.desc}</p></div>
+          </Link>
+        ))}
+      </div>
+      <div className="grid g2">
+        <Card title={t.home.topCutoffs} right={admission.state === "published" ? <OfficialBadge /> : undefined}>
+          {admission.state === "pending" ? <Pending admission={admission} year={year} compact /> : (
+            <>
+              <BarList max={100} rows={admission.faculties.slice(0, 6).map((x) => ({
+                key: x.key, label: name(x), value: x.cutoff, display: `${f(x.cutoff, 1)}%`, note: t.overview.needs(f(x.scoreNeeded, 0), n(max)),
+              }))} />
+              <p style={{ marginTop: 12 }}><Link to="/minimums">{t.ui.viewAll}</Link></p>
+            </>
+          )}
+        </Card>
+        <Card title={t.home.trustT}>
+          <ul className="list"><li>{t.home.trust1}</li><li>{t.home.trust2}</li><li>{t.home.trust3}</li></ul>
+          <p style={{ marginTop: 12 }}><Link to="/methodology">{t.nav.methodology}</Link></p>
+        </Card>
+      </div>
+    </>
   );
 }

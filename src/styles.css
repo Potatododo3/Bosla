@@ -150,6 +150,7 @@ input[type="range"] { width: 100%; accent-color: var(--primary); min-height: 32p
 
 .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 550; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--border); white-space: nowrap; }
 .badge-warn { background: var(--warn-soft); color: var(--warn-ink); border-color: transparent; }
+.badge-info { background: var(--primary-soft); color: var(--primary); border-color: transparent; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 550; white-space: nowrap; }
 .chip-good { background: var(--good-soft); color: var(--good-ink); }
 .chip-warn { background: var(--warn-soft); color: var(--warn-ink); }

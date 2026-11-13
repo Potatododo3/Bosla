@@ -1,13 +1,16 @@
 {
   "name": "bosla",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "Bosla — an independent, bilingual analytics companion for Thanaweya Amma 2026 results.",
+  "description": "Bosla — an independent, bilingual analytics companion for Thanaweya Amma results.",
   "scripts": {
+    "predev": "tsx server/prepare-admission.ts",
     "dev": "concurrently -k \"npm:api\" \"vite\"",
     "api": "tsx server/serve.ts --api-only",
+    "prebuild": "tsx server/prepare-admission.ts",
     "build": "tsc --noEmit && vite build",
+    "check-admission": "tsx server/prepare-admission.ts",
     "start": "tsx server/serve.ts",
     "build-data": "tsx server/build-data.ts",
     "typecheck": "tsc --noEmit",

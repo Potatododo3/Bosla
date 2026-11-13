@@ -27,8 +27,8 @@ const paged = (rows: Student[], page: number, size: number) => rows.slice((page 
 const byRankNullsLast = (a: Student, b: Student) =>
   (a.national_rank === null ? 1 : 0) - (b.national_rank === null ? 1 : 0) || (a.national_rank ?? 0) - (b.national_rank ?? 0) || a.seating_no - b.seating_no;
 
-export function handleApi(ds: Dataset, pathname: string, q: URLSearchParams): ApiResult {
-  if (pathname === "/api/health") return ok({ status: "ok", database: true, students: ds.students.length, ranked: ds.rankedCount, demo: ds.demo });
+export function handleApi(ds: Dataset, pathname: string, q: URLSearchParams, info: { year?: number | null } = {}): ApiResult {
+  if (pathname === "/api/health") return ok({ status: "ok", database: true, students: ds.students.length, ranked: ds.rankedCount, demo: ds.demo, max_score: ds.maxScore, year: info.year ?? null });
 
   if (pathname === "/api/search") {
     const page = intParam(q.get("page"), 1, 1, 1e9), size = intParam(q.get("size"), 25, 1, 100);

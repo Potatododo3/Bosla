@@ -2,14 +2,13 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { gradeBand, parseNumberInput, percentageOf, round, normalizeDigits } from "../src/domain/scores.ts";
 import { buildCohortIndex, countClearing, standingFor } from "../src/domain/standing.ts";
-import { estimateAll, fitTrend, outlookFor, pressureAdjustment } from "../src/domain/admission.ts";
-import { ADMISSION_2026 } from "../src/rules/admission2026.ts";
+import { outlookFor, resolveAdmission, validateAdmission } from "../src/domain/admissionConfig.ts";
 import { cleanName, nameKey, nameMatches, planQuery, seatPrefixRange } from "../src/domain/search.ts";
 import { crc32, toCSV, toXLSX } from "../src/domain/exporters.ts";
 
 const load = (f: string) => JSON.parse(readFileSync(new URL(`../public/data/${f}.json`, import.meta.url), "utf8"));
 const A = load("analytics");
-const P = JSON.parse(readFileSync(new URL("./fixtures/predictions.json", import.meta.url), "utf8"));
+const CFG = JSON.parse(readFileSync(new URL("../config/admission.json", import.meta.url), "utf8"));
 const ix = buildCohortIndex(A.frequency_table, A.stats_score.mean, A.stats_score.std);
 
 describe("scores", () => {
@@ -95,52 +94,78 @@ describe("standing (rank / percentile / T-score)", () => {
   });
 });
 
-describe("admission estimation model", () => {
-  const est = estimateAll(ADMISSION_2026, ix, A.stats_pct.mean);
-  it("pressure matches the reference", () => {
-    expect(round(pressureAdjustment(ADMISSION_2026, A.stats_pct.mean), 3)).toBe(P.meta.pressure_adjustment);
-    expect(pressureAdjustment(ADMISSION_2026, 100)).toBe(3);
-    expect(pressureAdjustment(ADMISSION_2026, 0)).toBe(-3);
+describe("official admission minimums (config/admission.json)", () => {
+  const published = (over: Record<string, unknown> = {}) => ({
+    year: 2026, published: true, label_ar: "الحد الأدنى للمرحلة الأولى", label_en: "First-phase minimums", source: "https://example.org/tansiq", updated: "2026-08-01",
+    faculties: [
+      { key: "medicine", name_ar: "الطب البشري", name_en: "Medicine", track: "science", cutoff: 95 },
+      { key: "law", name_ar: "الحقوق", name_en: "Law", track: "literary", cutoff: 60 },
+      { key: "engineering", name_ar: "الهندسة", name_en: "Engineering", track: "math", cutoff: 90 },
+    ],
+    ...over,
   });
-  it("linear fit: exact line, floor on sigma, two-point series", () => {
-    const f = fitTrend([2021, 2022, 2023], [80, 81, 82], 2026, 0.8);
-    expect(f.slope).toBeCloseTo(1, 12);
-    expect(f.projected).toBeCloseTo(85, 10);
-    expect(f.sigma).toBe(0.8);
-    expect(fitTrend([2024, 2025], [70, 72], 2026, 0.8).projected).toBeCloseTo(74, 10);
-    expect(() => fitTrend([2025], [70], 2026, 0.8)).toThrow();
+  const errors = (raw: unknown) => { const v = validateAdmission(raw); return v.ok ? [] : v.errors; };
+
+  it("the shipped file is valid and unpublished (no numbers shown until the owner enters them)", () => {
+    const v = validateAdmission(CFG);
+    expect(v.ok).toBe(true);
+    if (v.ok) { expect(v.config.published).toBe(false); expect(v.config.faculties.length).toBe(14); expect(v.config.faculties.every((f) => f.cutoff === null)).toBe(true); }
   });
-  it("reproduces every published faculty figure (14 faculties × all fields)", () => {
-    expect(est.length).toBe(14);
-    expect(est.map((e) => e.key)).toEqual(P.faculties.map((f: { key: string }) => f.key));
-    for (const ref of P.faculties) {
-      const e = est.find((x) => x.key === ref.key)!;
-      const tag = ref.key;
-      expect(e.expected, tag).toBe(ref.expected_cutoff);
-      expect(e.scoreNeeded, tag).toBe(ref.score_needed);
-      expect(e.sigma, tag).toBe(ref.confidence_interval_95.sigma);
-      expect(e.ciLow, tag).toBe(ref.confidence_interval_95.low);
-      expect(e.ciHigh, tag).toBe(ref.confidence_interval_95.high);
-      expect(e.slopePerYear, tag).toBeCloseTo(ref.trend.slope_per_year, 4);
-      expect(e.trendProjection, tag).toBe(ref.trend.projected_before_pressure);
-      expect(e.lastYear.delta, tag).toBe(ref.last_year.expected_vs_last);
-      for (const [mine, theirs] of [[e.optimistic, ref.scenarios.optimistic], [e.central, ref.scenarios.expected], [e.pessimistic, ref.scenarios.pessimistic]] as const) {
-        expect(mine.cutoff, tag).toBe(theirs.cutoff);
-        expect(mine.eligible, tag).toBe(theirs.eligible_students);
-        expect(mine.eligiblePct, tag).toBe(theirs.eligible_pct);
-      }
-      expect(e.history).toEqual(ref.history);
-    }
+  it("accepts a complete published file", () => expect(errors(published())).toEqual([]));
+  it("rejects incomplete or impossible entries with a message per problem", () => {
+    expect(errors(null).length).toBe(1);
+    expect(errors([]).length).toBe(1);
+    expect(errors(published({ year: "2027" }))[0]).toContain("year");
+    expect(errors(published({ published: "yes" }))[0]).toContain("published");
+    expect(errors(published({ source: "" }))[0]).toContain("source");
+    expect(errors(published({ source: "ministry website" }))[0]).toContain("source");
+    expect(errors(published({ updated: "August 2026" }))[0]).toContain("updated");
+    expect(errors(published({ label_en: " " }))[0]).toContain("label_en");
+    expect(errors(published({ faculties: [] }))[0]).toContain("faculties");
+    const f = (x: Record<string, unknown>) => errors(published({ faculties: [{ key: "a", name_ar: "أ", name_en: "A", track: "science", cutoff: 80, ...x }] }));
+    expect(f({ cutoff: 101 })[0]).toContain("between 0 and 100");
+    expect(f({ cutoff: -1 })[0]).toContain("between 0 and 100");
+    expect(f({ cutoff: "90" })[0]).toContain("between 0 and 100");
+    expect(f({ cutoff: null })[0]).toContain("empty");
+    expect(f({ track: "arts" })[0]).toContain("track");
+    expect(f({ key: "Has Space" })[0]).toContain("key");
+    expect(f({ name_ar: "" })[0]).toContain("name_ar");
+    const dup = published(); (dup.faculties as { key: string }[])[1]!.key = "medicine";
+    expect(errors(dup)[0]).toContain("more than once");
+    // unpublished files may leave cutoffs and labels empty
+    expect(errors({ year: 2027, published: false, faculties: [{ key: "a", name_ar: "أ", name_en: "A", track: "mixed", cutoff: null }] })).toEqual([]);
   });
-  it("expected = trend + pressure + calibration (decomposition is consistent)", () => {
-    for (const e of est) expect(e.trendProjection + e.pressure + e.calibration).toBeCloseTo(e.expected, 1);
+  it("never shows figures for the wrong year, or before publication", () => {
+    const ok = validateAdmission(published()); if (!ok.ok) throw new Error("fixture");
+    expect(resolveAdmission(null, 2026, ix)).toEqual({ state: "pending", reason: "missing", configYear: null });
+    expect(resolveAdmission(ok.config, 2027, ix)).toEqual({ state: "pending", reason: "wrong_year", configYear: 2026 });
+    expect(resolveAdmission({ ...ok.config, published: false }, 2026, ix)).toMatchObject({ state: "pending", reason: "not_published" });
   });
-  it("outlook classification", () => {
-    const med = est.find((e) => e.key === "medicine")!;
-    expect(outlookFor(med.pessimistic.cutoff, med)).toBe("likely");
-    expect(outlookFor(med.central.cutoff, med)).toBe("expected");
-    expect(outlookFor(med.optimistic.cutoff, med)).toBe("borderline");
-    expect(outlookFor(med.optimistic.cutoff - 0.01, med)).toBe("below");
+  it("published: sorted by minimum, with total needed and students at or above it", () => {
+    const ok = validateAdmission(published()); if (!ok.ok) throw new Error("fixture");
+    const r = resolveAdmission(ok.config, 2026, ix);
+    if (r.state !== "published") throw new Error("expected published");
+    expect(r.faculties.map((f) => f.key)).toEqual(["medicine", "engineering", "law"]);
+    const med = r.faculties[0]!, t95 = A.thresholds.find((t: { threshold: number }) => t.threshold === 95), t90 = A.thresholds.find((t: { threshold: number }) => t.threshold === 90);
+    expect(med).toMatchObject({ cutoff: 95, scoreNeeded: 304, clearing: t95.count_sitters, clearingPct: round(t95.pct_sitters, 2) });
+    expect(r.faculties[1]).toMatchObject({ scoreNeeded: 288, clearing: t90.count_sitters });
+  });
+  it("total needed follows the year's maximum", () => {
+    const ix400 = buildCohortIndex([{ score: 100, count: 1, cumulative_count: 1 }, { score: 380, count: 1, cumulative_count: 2 }], 240, 140, 400);
+    const ok = validateAdmission(published()); if (!ok.ok) throw new Error("fixture");
+    const r = resolveAdmission(ok.config, 2026, ix400);
+    if (r.state !== "published") throw new Error("expected published");
+    expect(r.faculties[0]).toMatchObject({ scoreNeeded: 380, clearing: 1, clearingPct: 50 });
+    expect(standingFor(ix400, 380)).toMatchObject({ rank: 1, percentage: 95, band: "ge95" });
+    expect(standingFor(ix400, 100).percentage).toBe(25);
+  });
+  it("outlook: meets / within one point / below", () => {
+    expect(outlookFor(90, 90)).toBe("above");
+    expect(outlookFor(95.2, 90)).toBe("above");
+    expect(outlookFor(89.99, 90)).toBe("close");
+    expect(outlookFor(89.01, 90)).toBe("close");
+    expect(outlookFor(89, 90)).toBe("below");
+    expect(outlookFor(40, 90)).toBe("below");
   });
 });
 

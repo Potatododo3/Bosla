@@ -109,7 +109,7 @@ export function Search() {
             {profile.state === "loading" && <div className="sk" style={{ height: 160 }} role="status" aria-label={t.ui.loading} />}
             {profile.state === "missing" && <p role="alert">{t.search.notFoundProfile}</p>}
             {profile.state === "error" && <p role="alert">{t.search.failD}</p>}
-            {profile.state === "ready" && <Profile s={profile.data} />}
+            {profile.state === "ready" && <Profile s={profile.data} max={health.state === "on" ? health.max : 320} />}
             <div className="exportbar no-print"><button className="btn sm" onClick={() => setProfile(null)}><Icon name="x" size={15} />{t.search.closeProfile}</button></div>
           </Card>
         )}
@@ -138,7 +138,7 @@ export function Search() {
   );
 }
 
-function Profile({ s }: { s: StudentProfile }) {
+function Profile({ s, max }: { s: StudentProfile; max: number }) {
   const { t, n, f, g } = useI18n();
   const tier = s.is_top_1pct ? t.standing.tier.top1 : s.is_top_5pct ? t.standing.tier.top5 : s.is_top_10pct ? t.standing.tier.top10 : null;
   return (
@@ -149,7 +149,7 @@ function Profile({ s }: { s: StudentProfile }) {
       </div>
       <div className="grid g4" style={{ margin: "14px 0" }}>
         <Stat label={t.standing.rank} value={s.national_rank === null ? "—" : n(s.national_rank)} sub={s.percentile === null ? t.search.unrankedWhy : t.search.aheadOf(f(s.percentile, 1))} />
-        <Stat label={t.col.score} value={g(s.total_degree, 1)} sub={t.ui.outOf320} />
+        <Stat label={t.col.score} value={g(s.total_degree, 1)} sub={t.ui.outOf(n(max))} />
         <Stat label={t.col.percentage} value={f(s.percentage, 2)} unit="%" />
         <Stat label={t.col.perf} value={s.performance_index === null ? "—" : f(s.performance_index, 1)} />
       </div>

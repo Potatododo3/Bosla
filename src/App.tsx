@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useCore } from "./data/store.tsx";
 import { useI18n } from "./i18n/index.tsx";
 import { Icon, Loading } from "./components/ui.tsx";
 import { Home } from "./pages/Home.tsx";
@@ -8,7 +9,7 @@ import type { Dict } from "./i18n/en.ts";
 
 // Analytics pages are split out so the student tools load first on slow connections.
 const Admission = lazy(() => import("./pages/Admission.tsx").then((m) => ({ default: m.Admission })));
-const Predictions = lazy(() => import("./pages/Admission.tsx").then((m) => ({ default: m.Predictions })));
+const Minimums = lazy(() => import("./pages/Admission.tsx").then((m) => ({ default: m.Minimums })));
 const Search = lazy(() => import("./pages/Search.tsx").then((m) => ({ default: m.Search })));
 const Overview = lazy(() => import("./pages/Analytics.tsx").then((m) => ({ default: m.Overview })));
 const Distribution = lazy(() => import("./pages/Analytics.tsx").then((m) => ({ default: m.Distribution })));
@@ -25,7 +26,7 @@ const NAV: { group: NavKey; items: { to: string; key: NavKey; icon: string }[] }
     { to: "/", key: "home", icon: "home" },
     { to: "/standing", key: "standing", icon: "target" },
     { to: "/admission", key: "admission", icon: "cap" },
-    { to: "/predictions", key: "predictions", icon: "compass" },
+    { to: "/minimums", key: "minimums", icon: "check" },
     { to: "/search", key: "search", icon: "search" },
   ] },
   { group: "groupAnalytics", items: [
@@ -83,6 +84,8 @@ export function App() {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   const online = useOnline();
+  const core = useCore();
+  const year = core.state === "ready" ? String(core.data.year) : null;
 
   // Route change: close the drawer, move focus to the content, set the title.
   useEffect(() => {
@@ -118,7 +121,7 @@ export function App() {
             </div>
           ))}
         </nav>
-        <div className="sidebar-foot">{t.ui.dataYear}<br />{t.home.eyebrow}</div>
+        <div className="sidebar-foot">{year && <>{t.ui.dataYear(year)}<br /></>}{t.home.eyebrow}</div>
       </aside>
       <button className={open ? "scrim show" : "scrim"} aria-label={t.nav.close} tabIndex={open ? 0 : -1} onClick={() => setOpen(false)} />
 
@@ -139,7 +142,8 @@ export function App() {
               <Route path="/" element={<Home />} />
               <Route path="/standing" element={<Standing />} />
               <Route path="/admission" element={<Admission />} />
-              <Route path="/predictions" element={<Predictions />} />
+              <Route path="/minimums" element={<Minimums />} />
+              <Route path="/predictions" element={<Navigate to="/minimums" replace />} />
               <Route path="/search" element={<Search />} />
               <Route path="/overview" element={<Overview />} />
               <Route path="/distribution" element={<Distribution />} />

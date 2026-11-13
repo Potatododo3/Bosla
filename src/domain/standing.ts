@@ -4,12 +4,12 @@
  * needed, so this works fully in the browser with no personal data.
  *
  * Definitions (identical to the reference methodology):
- *  - Ranked cohort: exam-sitters with a valid score (N = 884,661 in 2026).
+ *  - Ranked cohort: exam-sitters with a valid score.
  *  - National rank: competition ranking ("1224"), 1 = highest; ties share the best rank.
  *  - Percentile: share of the ranked cohort scoring ≤ this score, 0–100.
  *  - Performance index: T-score 50 + 10·(score − μ)/σ, clipped to 0–100.
  */
-import { gradeBand, percentageOf, round, type BandKey } from "./scores.ts";
+import { MAX_SCORE, gradeBand, percentageOf, round, type BandKey } from "./scores.ts";
 
 export interface FrequencyRow {
   score: number;
@@ -18,6 +18,8 @@ export interface FrequencyRow {
 }
 
 export interface CohortIndex {
+  /** maximum total for this results year */
+  max: number;
   n: number;
   mean: number;
   std: number;
@@ -26,7 +28,7 @@ export interface CohortIndex {
   cumulative: Int32Array; // students with score ≤ scores[i]
 }
 
-export function buildCohortIndex(rows: ReadonlyArray<FrequencyRow>, mean: number, std: number): CohortIndex {
+export function buildCohortIndex(rows: ReadonlyArray<FrequencyRow>, mean: number, std: number, max: number = MAX_SCORE): CohortIndex {
   const sorted = [...rows].sort((a, b) => a.score - b.score);
   const scores = new Float64Array(sorted.length);
   const counts = new Int32Array(sorted.length);
@@ -38,7 +40,7 @@ export function buildCohortIndex(rows: ReadonlyArray<FrequencyRow>, mean: number
     counts[i] = r.count;
     cumulative[i] = run;
   });
-  return { n: run, mean, std: std === 0 ? 1 : std, scores, counts, cumulative };
+  return { max, n: run, mean, std: std === 0 ? 1 : std, scores, counts, cumulative };
 }
 
 /** Index of the last entry with score ≤ x, or -1. */
@@ -66,11 +68,11 @@ export function countBelow(ix: CohortIndex, score: number): number {
 
 /** Students whose percentage is ≥ cutoffPct (how many "clear" a cutoff). */
 export function countClearing(ix: CohortIndex, cutoffPct: number): number {
-  // Compare on percentages computed exactly as the pipeline does (score/320*100).
+  // Compare on percentages computed exactly as the pipeline does (score / max × 100).
   let lo = 0, hi = ix.scores.length; // first index with pct >= cutoff
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (percentageOf(ix.scores[mid]!) < cutoffPct) lo = mid + 1; else hi = mid;
+    if (percentageOf(ix.scores[mid]!, ix.max) < cutoffPct) lo = mid + 1; else hi = mid;
   }
   const below = lo === 0 ? 0 : ix.cumulative[lo - 1]!;
   return ix.n - below;
@@ -98,7 +100,7 @@ export function standingFor(ix: CohortIndex, score: number): Standing {
   const ahead = ix.n - atOrBelow;
   const percentile = round((atOrBelow / ix.n) * 100, 4);
   const t = 50 + (10 * (score - ix.mean)) / ix.std;
-  const percentage = percentageOf(score);
+  const percentage = percentageOf(score, ix.max);
   return {
     score,
     percentage,

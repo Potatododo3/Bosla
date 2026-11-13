@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Analytics, Quality, SearchResponse, StudentProfile } from "./types.ts";
 import { buildCohortIndex, type CohortIndex } from "../domain/standing.ts";
-import { estimateAll, type FacultyEstimate } from "../domain/admission.ts";
-import { ADMISSION_2026 } from "../rules/admission2026.ts";
+import { resolveAdmission, validateAdmission, type AdmissionConfig, type AdmissionState } from "../domain/admissionConfig.ts";
+import { MAX_SCORE } from "../domain/scores.ts";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -21,15 +21,21 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
 export interface Core {
   a: Analytics;
   cohort: CohortIndex;
-  faculties: FacultyEstimate[];
-  pressure: number;
+  /** results year and maximum total, from the generated data */
+  year: number;
+  max: number;
+  /** official minimums, or the reason none are shown */
+  admission: AdmissionState;
 }
 let corePromise: Promise<Core> | null = null;
 function loadCore(): Promise<Core> {
-  corePromise ??= getJson<Analytics>("/data/analytics.json").then((a) => {
-    const cohort = buildCohortIndex(a.frequency_table, a.stats_score.mean, a.stats_score.std);
-    const faculties = estimateAll(ADMISSION_2026, cohort, a.stats_pct.mean);
-    return { a, cohort, faculties, pressure: faculties[0]?.pressure ?? 0 };
+  // The admission file is optional: if it is missing or malformed, admission pages show "not published".
+  const admission = getJson<unknown>("/data/admission.json").then((raw): AdmissionConfig | null => { const v = validateAdmission(raw); return v.ok ? v.config : null; }, () => null);
+  corePromise ??= Promise.all([getJson<Analytics>("/data/analytics.json"), admission]).then(([a, cfg]) => {
+    const year = a.meta?.year, max = a.meta?.max_score ?? MAX_SCORE;
+    if (!Number.isInteger(year)) throw new Error("analytics.json has no meta.year");
+    const cohort = buildCohortIndex(a.frequency_table, a.stats_score.mean, a.stats_score.std, max);
+    return { a, cohort, year: year as number, max, admission: resolveAdmission(cfg, year as number, cohort) };
   }).catch((e) => { corePromise = null; throw e; });
   return corePromise;
 }
@@ -56,11 +62,11 @@ export const useQuality = () => useLoader(loadQuality);
 
 /* ---- search API (optional backend) -------------------------------------- */
 const API = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ?? "";
-export type ApiHealth = { state: "checking" } | { state: "off" } | { state: "on"; demo: boolean; students: number };
+export type ApiHealth = { state: "checking" } | { state: "off" } | { state: "on"; demo: boolean; students: number; max: number };
 let healthPromise: Promise<ApiHealth> | null = null;
 export function checkHealth(): Promise<ApiHealth> {
-  healthPromise ??= getJson<{ status: string; demo?: boolean; students?: number }>(`${API}/api/health`)
-    .then((h): ApiHealth => (h.status === "ok" ? { state: "on", demo: !!h.demo, students: h.students ?? 0 } : { state: "off" }))
+  healthPromise ??= getJson<{ status: string; demo?: boolean; students?: number; max_score?: number }>(`${API}/api/health`)
+    .then((h): ApiHealth => (h.status === "ok" ? { state: "on", demo: !!h.demo, students: h.students ?? 0, max: h.max_score ?? MAX_SCORE } : { state: "off" }))
     .catch((): ApiHealth => ({ state: "off" }));
   return healthPromise;
 }

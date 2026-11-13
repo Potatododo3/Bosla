@@ -6,7 +6,7 @@
  *   SEARCH_API=off npm start          → app only; the search page shows "not connected"
  */
 import { createServer } from "node:http";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDataset, loadCsv, type Dataset } from "./dataset.ts";
@@ -18,14 +18,23 @@ const dist = join(root, "dist");
 const apiOnly = process.argv.includes("--api-only");
 const port = Number(process.env.PORT ?? 8787);
 
+// The statistics file tells us which year and maximum total the site is showing.
+const analyticsPath = join(root, "public/data/analytics.json");
+const published: { meta?: { year?: number; max_score?: number }; cohort?: { sitters?: number } } = existsSync(analyticsPath) ? JSON.parse(readFileSync(analyticsPath, "utf8")) : {};
+const maxScore = published.meta?.max_score ?? 320, year = published.meta?.year ?? null;
+
 let ds: Dataset | null = null;
 if (process.env.SEARCH_API !== "off") {
   const csv = process.env.STUDENTS_CSV;
   const t0 = Date.now();
   ds = csv
-    ? buildDataset(loadCsv(csv), false)
-    : buildDataset(synthesize(Number(process.env.DEMO_STUDENTS ?? 5000), join(root, "public/data/analytics.json")), true);
+    ? buildDataset(loadCsv(csv), false, maxScore)
+    : buildDataset(synthesize(Number(process.env.DEMO_STUDENTS ?? 5000), analyticsPath), true, maxScore);
   console.log(`[api] ${ds.students.length.toLocaleString()} students (${ds.rankedCount.toLocaleString()} ranked) loaded in ${Date.now() - t0} ms — ${ds.demo ? "SYNTHETIC DEMO DATA" : csv}`);
+  const expected = published.cohort?.sitters;
+  if (!ds.demo && expected !== undefined && expected !== ds.rankedCount) {
+    console.warn(`\n⚠ The site's statistics (${year ?? "?"}) were built from ${expected.toLocaleString()} ranked students, but this CSV has ${ds.rankedCount.toLocaleString()}.\n  Search results and the statistics pages will disagree. Rebuild the statistics from this file:\n    npm run build-data -- --csv ${csv} --year <yyyy>   then   npm run build\n`);
+  }
 }
 
 const MIME: Record<string, string> = {
@@ -56,7 +65,7 @@ createServer((req, res) => {
     if (!ds) return send(503, '{"detail":"Search API is disabled on this deployment"}', json);
     if (limited(req.socket.remoteAddress ?? "?")) return send(429, '{"detail":"Too many requests"}', json);
     try {
-      const r = handleApi(ds, url.pathname, url.searchParams);
+      const r = handleApi(ds, url.pathname, url.searchParams, { year });
       return send(r.status, JSON.stringify(r.body), json);
     } catch (e) {
       console.error(e);

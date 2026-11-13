@@ -9,3 +9,6 @@ dist
 *.csv
 *.xlsx
 *.db
+
+# generated from config/admission.json
+/public/data/admission.json

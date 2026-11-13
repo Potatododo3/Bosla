@@ -6,6 +6,7 @@ export interface Stats { n: number; mean: number; median: number; mode: number; 
 export interface NormTest { statistic: number; p_value: number; sample_n?: number; "normal_at_0.05": boolean }
 
 export interface Analytics {
+  meta?: { year?: number; max_score?: number; generated_at?: string; names_hidden?: boolean };
   cohort: { total_students: number; sitters: number; absent: number; invalid: number };
   status_distribution: { key: StatusKey; count: number; pct: number }[];
   grade_bands_sitters: { key: BandKey; low: number; high: number; count: number; pct: number }[];
@@ -25,7 +26,7 @@ export interface Analytics {
     anderson_darling: { statistic: number; critical_values: number[]; significance_levels: number[] };
   };
   normal_fit_pct: { mu: number; sigma: number };
-  clusters: { k: number; sample_n: number; clusters: { cluster: number; center_score: number; center_pct: number; share_pct: number; min_score: number; max_score: number }[] };
+  clusters: { k: number; sample_n: number; method?: string; clusters: { cluster: number; center_score: number; center_pct: number; share_pct: number; min_score: number; max_score: number }[] };
   heatmap_band_status: { bands: { key: BandKey }[]; statuses: { key: StatusKey }[]; matrix: number[][] };
   top_100: TopStudent[];
   extremes: { perfect_scores: number; ge_98pct: number; ge_99pct: number };
@@ -35,6 +36,7 @@ export interface Analytics {
 export interface TopStudent { national_rank: number; seating_no: number; name: string; total_degree: number; percentage: number; performance_index: number }
 
 export interface Quality {
+  meta?: { year?: number; max_score?: number };
   generated_rows: number;
   cleaning_log: { exact_duplicate_rows_removed: number; status_trailing_ws_fixed: number };
   overall_quality_score: number;

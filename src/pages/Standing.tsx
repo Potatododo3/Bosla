@@ -3,26 +3,30 @@ import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/index.tsx";
 import { useCore, useScore, type Core } from "../data/store.tsx";
 import { standingFor } from "../domain/standing.ts";
-import { outlookFor, type Outlook } from "../domain/admission.ts";
-import { Card, ChartCard, Icon, Note, PageHead, Ready, Stat, UnofficialBadge, YearBadge } from "../components/ui.tsx";
+import { outlookFor } from "../domain/admissionConfig.ts";
+import { Card, ChartCard, Icon, OfficialBadge, PageHead, Ready, Stat, YearBadge } from "../components/ui.tsx";
+import { OUTLOOK_ICON, OUTLOOK_TONE, Pending, useFacultyName } from "./Admission.tsx";
 import { ScoreFields } from "../components/ScoreField.tsx";
 import { XYChart } from "../charts/XYChart.tsx";
 import { Meter } from "../charts/Parts.tsx";
-
-export const OUTLOOK_TONE: Record<Outlook, string> = { likely: "good", expected: "info", borderline: "warn", below: "mute" };
-export const OUTLOOK_ICON: Record<Outlook, string> = { likely: "✓", expected: "≈", borderline: "!", below: "–" };
 
 export function Standing() {
   const { t } = useI18n();
   const core = useCore();
   return (
     <div className="page">
-      <PageHead title={t.standing.title} sub={t.standing.sub} badge={<YearBadge />} />
-      <Card>
-        <ScoreFields />
-        <p className="muted" style={{ fontSize: 13, marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}><Icon name="lock" size={15} />{t.standing.privacy}</p>
-      </Card>
-      <Ready of={core}>{(c) => <Result core={c} />}</Ready>
+      <Ready of={core}>
+        {(c) => (
+          <>
+            <PageHead title={t.standing.title} sub={t.standing.sub(String(c.year))} badge={<YearBadge year={c.year} />} />
+            <Card>
+              <ScoreFields max={c.max} />
+              <p className="muted" style={{ fontSize: 13, marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}><Icon name="lock" size={15} />{t.standing.privacy}</p>
+            </Card>
+            <Result core={c} />
+          </>
+        )}
+      </Ready>
     </div>
   );
 }
@@ -30,6 +34,8 @@ export function Standing() {
 function Result({ core }: { core: Core }) {
   const { t, n, f, g } = useI18n();
   const { score, setScore } = useScore();
+  const name = useFacultyName();
+  const adm = core.admission;
   const [copied, setCopied] = useState(false);
   const st = useMemo(() => (score === null ? null : standingFor(core.cohort, score)), [core, score]);
   const H = core.a.histogram_pct;
@@ -37,7 +43,7 @@ function Result({ core }: { core: Core }) {
   if (!st) return <div className="state"><Icon name="target" size={30} /><p>{t.standing.empty}</p></div>;
 
   const tier = st.top1 ? t.standing.tier.top1 : st.top5 ? t.standing.tier.top5 : st.top10 ? t.standing.tier.top10 : null;
-  const summary = t.standing.summary(g(st.score, 2), f(st.percentage, 2), n(st.rank), n(st.cohort), f(st.percentile, 2));
+  const summary = t.standing.summary(String(core.year), g(st.score, 2), n(core.max), f(st.percentage, 2), n(st.rank), n(st.cohort), f(st.percentile, 2));
   const copy = async () => {
     try { await navigator.clipboard.writeText(summary); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard unavailable */ }
   };
@@ -56,7 +62,7 @@ function Result({ core }: { core: Core }) {
 
       <Card>
         <div className="chips" style={{ marginBottom: 12 }}>
-          <span className="chip chip-info">{g(st.score, 2)} / 320</span>
+          <span className="chip chip-info"><bdi>{g(st.score, 2)} / {n(core.max)}</bdi></span>
           <span className="chip chip-info">{f(st.percentage, 2)}%</span>
           <span className="chip chip-mute">{t.standing.band}: {t.band[st.band]}</span>
           {tier && <span className="chip chip-good"><span aria-hidden="true">★</span>{tier}</span>}
@@ -83,22 +89,25 @@ function Result({ core }: { core: Core }) {
           tooltip={(i) => ({ title: `${H.bin_centers[i]! - 1}–${H.bin_centers[i]! + 1}%`, rows: [{ label: t.ui.students, value: n(H.counts[i]!) }] })} />
       </ChartCard>
 
-      <Card title={t.standing.facT} desc={t.standing.facD} right={<UnofficialBadge />}>
-        <ul className="outlook">
-          {core.faculties.map((x) => {
-            const o = outlookFor(st.percentage, x), d = st.percentage - x.central.cutoff;
-            return (
-              <li key={x.key}>
-                <span>{t.faculty[x.key]}</span>
-                <span className="margin"><bdi>{d >= 0 ? "+" : "−"}{f(Math.abs(d), 1)}</bdi></span>
-                <span className={`chip chip-${OUTLOOK_TONE[o]}`}><span aria-hidden="true">{OUTLOOK_ICON[o]}</span>{t.admission.outlook[o]}</span>
-              </li>
-            );
-          })}
-        </ul>
-        <p style={{ marginTop: 12 }}><Link to="/admission">{t.standing.facLink}</Link></p>
+      <Card title={t.standing.facT} right={adm.state === "published" ? <OfficialBadge /> : undefined}>
+        {adm.state === "pending" ? <Pending admission={adm} year={core.year} compact /> : (
+          <>
+            <ul className="outlook">
+              {adm.faculties.map((x) => {
+                const o = outlookFor(st.percentage, x.cutoff), d = st.percentage - x.cutoff;
+                return (
+                  <li key={x.key}>
+                    <span>{name(x)}</span>
+                    <span className="margin"><bdi>{d >= 0 ? "+" : "−"}{f(Math.abs(d), 2)}</bdi></span>
+                    <span className={`chip chip-${OUTLOOK_TONE[o]}`}><span aria-hidden="true">{OUTLOOK_ICON[o]}</span>{t.adm.outlook[o]}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <p style={{ marginTop: 12 }}><Link to="/admission">{t.standing.facLink}</Link></p>
+          </>
+        )}
       </Card>
-      <Note tone="warn">{t.home.trust1}</Note>
     </>
   );
 }

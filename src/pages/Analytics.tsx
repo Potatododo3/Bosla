@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/index.tsx";
 import { useCore, useQuality } from "../data/store.tsx";
 import type { TopStudent } from "../data/types.ts";
-import { ADMISSION_2026 } from "../rules/admission2026.ts";
 import { nameKey } from "../domain/search.ts";
 import { normalizeDigits } from "../domain/scores.ts";
 import { Card, ChartCard, DataTable, ExportBar, Note, PageHead, Ready, STATUS_COLOR, Stat, YearBadge, type Column } from "../components/ui.tsx";
@@ -32,23 +31,22 @@ export function Overview() {
   const topCols = useTopColumns();
   return (
     <div className="page">
-      <PageHead title={t.overview.title} sub={t.overview.sub} badge={<YearBadge />} />
       <Ready of={core}>
-        {({ a }) => {
+        {({ a, year, max }) => {
           const pass = a.status_distribution.find((s) => s.key === "pass_r1")!;
           const t90 = a.thresholds.find((x) => x.threshold === 90)!, t95 = a.thresholds.find((x) => x.threshold === 95)!;
           const I = t.overview.insights;
           const insights = [
             I.cohort(n(a.cohort.total_students), n(a.cohort.sitters), n(a.cohort.absent)),
-            I.center(f(a.stats_pct.mean, 2), f(a.stats_pct.median, 2), n(a.stats_score.mode), f(a.stats_pct.std, 2)),
+            I.center(f(a.stats_pct.mean, 2), f(a.stats_pct.median, 2), n(a.stats_score.mode), n(max), f(a.stats_pct.std, 2)),
             I.shape(f(a.stats_pct.skewness, 2), f(a.stats_pct.kurtosis_excess, 2)),
             I.high(n(t90.count_sitters), f(t90.pct_sitters, 2), n(t95.count_sitters), f(t95.pct_sitters, 2)),
             I.pass(f(pass.pct, 1)),
             I.pile(n(a.gap_analysis.largest_jump_at_pct)),
-            I.pressure(f(a.stats_pct.mean, 1), n(ADMISSION_2026.baselineMeanPct)),
           ];
           return (
             <>
+              <PageHead title={t.overview.title} sub={t.overview.sub(String(year))} badge={<YearBadge year={year} />} />
               <div className="grid g4">
                 <Stat label={t.overview.kTotal} value={n(a.cohort.total_students)} sub={t.overview.kSitters(n(a.cohort.sitters))} />
                 <Stat label={t.overview.kPass} value={f(pass.pct, 1)} unit="%" sub={`${n(pass.count)} ${t.ui.students}`} />
@@ -65,7 +63,7 @@ export function Overview() {
               </div>
               <div className="grid g2">
                 <Card title={t.overview.thrT} desc={t.overview.thrD}>
-                  <BarList rows={a.thresholds.map((x) => ({ key: String(x.threshold), label: <bdi>≥ {x.threshold}% · {t.overview.needs(n(x.score_needed))}</bdi>, value: x.count_sitters, display: n(x.count_sitters), note: `${f(x.pct_sitters, 1)}%` }))} />
+                  <BarList rows={a.thresholds.map((x) => ({ key: String(x.threshold), label: <bdi>≥ {x.threshold}% · {t.overview.needs(n(x.score_needed), n(max))}</bdi>, value: x.count_sitters, display: n(x.count_sitters), note: `${f(x.pct_sitters, 1)}%` }))} />
                 </Card>
                 <Card title={t.overview.insightsT}>
                   <ul className="list">{insights.map((s) => <li key={s}>{s}</li>)}</ul>
@@ -88,22 +86,23 @@ export function Distribution() {
   const core = useCore();
   return (
     <div className="page">
-      <PageHead title={t.dist.title} sub={t.dist.sub} badge={<YearBadge />} />
       <Ready of={core}>
-        {({ a }) => {
+        {({ a, year, max }) => {
           const H = a.histogram_pct, { mu, sigma } = a.normal_fit_pct;
           const binW = H.bin_edges[1]! - H.bin_edges[0]!;
           const normal = H.bin_centers.map((x) => (H.total * binW * Math.exp(-0.5 * ((x - mu) / sigma) ** 2)) / (sigma * Math.sqrt(2 * Math.PI)));
           const D = a.density_pct, C = a.cdf_pct, F = a.frequency_table;
           const pctTicks = [0, 20, 40, 60, 80, 100], pf = (v: number) => `${v}%`;
           const step = (arr: number[], k: number) => arr.filter((_, i) => i % k === 0);
+          const q = [0, max / 4, max / 2, (3 * max) / 4, max];
           return (
             <>
+              <PageHead title={t.dist.title} sub={t.dist.sub} badge={<YearBadge year={year} />} />
               <div className="grid g4">
                 <Stat label={t.dist.mean} value={f(a.stats_pct.mean, 2)} unit="%" />
                 <Stat label={t.dist.median} value={f(a.stats_pct.median, 2)} unit="%" />
-                <Stat label={t.dist.sd} value={f(a.stats_pct.std, 2)} unit={t.pred.pp} />
-                <Stat label={t.dist.iqr} value={f(a.stats_pct.iqr, 2)} unit={t.pred.pp} sub={<bdi>{f(a.box_overall.q1, 1)}% – {f(a.box_overall.q3, 1)}%</bdi>} />
+                <Stat label={t.dist.sd} value={f(a.stats_pct.std, 2)} unit={t.ui.pts} />
+                <Stat label={t.dist.iqr} value={f(a.stats_pct.iqr, 2)} unit={t.ui.pts} sub={<bdi>{f(a.box_overall.q1, 1)}% – {f(a.box_overall.q3, 1)}%</bdi>} />
               </div>
               <ChartCard title={t.dist.histT} desc={t.dist.histD(n(H.total))}
                 legend={<Legend items={[{ name: t.dist.hist, color: "var(--series-1)" }, { name: t.dist.normal, color: "var(--series-2)", line: true, dashed: true }]} />}
@@ -139,9 +138,9 @@ export function Distribution() {
               </ChartCard>
               <ChartCard title={t.dist.freqT} desc={t.dist.freqD(n(F.length))}
                 table={{ head: [t.col.score, t.col.percentage, t.col.count, t.col.cumulative], rows: F.map((r) => [r.score, `${f(r.pct_value, 2)}%`, n(r.count), `${f(r.cumulative_pct, 2)}%`]) }}>
-                <XYChart ariaLabel={t.dist.freqT} xDomain={[0, 320]} xTicks={[0, 80, 160, 240, 320]} xFormat={String} yFormat={kfmt}
+                <XYChart ariaLabel={t.dist.freqT} xDomain={[0, max]} xTicks={q} xFormat={String} yFormat={kfmt}
                   series={[{ kind: "bar", name: t.col.count, color: "var(--series-1)", x: F.map((r) => r.score), y: F.map((r) => r.count), width: 0.5 }]}
-                  tooltip={(i) => ({ title: `${F[i]!.score} / 320 · ${f(F[i]!.pct_value, 2)}%`, rows: [{ label: t.ui.students, value: n(F[i]!.count) }, { label: t.dist.cumulative, value: `${f(F[i]!.cumulative_pct, 2)}%` }] })} />
+                  tooltip={(i) => ({ title: `${F[i]!.score} / ${max} · ${f(F[i]!.pct_value, 2)}%`, rows: [{ label: t.ui.students, value: n(F[i]!.count) }, { label: t.dist.cumulative, value: `${f(F[i]!.cumulative_pct, 2)}%` }] })} />
               </ChartCard>
             </>
           );
@@ -159,26 +158,27 @@ export function Top() {
   const [filter, setFilter] = useState("");
   return (
     <div className="page">
-      <PageHead title={t.top.title} sub={t.top.sub} badge={<YearBadge />} />
       <Ready of={core}>
-        {({ a }) => {
+        {({ a, year, max }) => {
           const key = nameKey(filter), digits = normalizeDigits(filter).replace(/\D/g, "");
           const rows = !filter.trim() ? a.top_100 : a.top_100.filter((r) =>
             (digits !== "" && String(r.seating_no).includes(digits)) || (key !== "" && nameKey(r.name).includes(key)));
           const P = a.percentiles_pct, N = a.cohort.sitters;
+          const shown = a.meta?.names_hidden ? cols.filter((c) => c.key !== "name") : cols;
           return (
             <>
+              <PageHead title={t.top.title} sub={t.top.sub} badge={<YearBadge year={year} />} />
               <div className="grid g3">
                 {a.top_100.slice(0, 3).map((p, i) => (
                   <div className="card podium" key={p.seating_no}>
                     <span className={`rank r${i + 1}`}>{n(p.national_rank)}</span>
-                    <b>{p.name}</b>
-                    <small><bdi>{g(p.total_degree, 1)} / 320 · {f(p.percentage, 2)}%</bdi></small>
+                    <b>{p.name || <bdi>{p.seating_no}</bdi>}</b>
+                    <small><bdi>{g(p.total_degree, 1)} / {n(max)} · {f(p.percentage, 2)}%</bdi></small>
                   </div>
                 ))}
               </div>
               <div className="grid g4">
-                <Stat label={t.top.perfect} value={n(a.extremes.perfect_scores)} sub={<bdi>320 / 320</bdi>} />
+                <Stat label={t.top.perfect} value={n(a.extremes.perfect_scores)} sub={<bdi>{n(max)} / {n(max)}</bdi>} />
                 <Stat label={t.top.top1} value={n(Math.round(N * 0.01))} sub={t.top.from(f(P["99"]!, 1))} />
                 <Stat label={t.top.top5} value={n(Math.round(N * 0.05))} sub={t.top.from(f(P["95"]!, 1))} />
                 <Stat label={t.top.top10} value={n(Math.round(N * 0.1))} sub={t.top.from(f(P["90"]!, 1))} />
@@ -188,8 +188,8 @@ export function Top() {
                   <label className="sr-only" htmlFor="top-filter">{t.top.filter}</label>
                   <input id="top-filter" className="input" type="search" style={{ minHeight: 38, fontSize: 14 }} placeholder={t.top.filter} value={filter} onChange={(e) => setFilter(e.target.value)} />
                 </div>}>
-                <DataTable stack columns={cols} rows={rows} rowKey={(r) => r.seating_no} caption={t.top.leaderT} empty={t.top.filterNone} />
-                <ExportBar name="bosla-2026-top-100" sheet={t.top.leaderT} columns={cols} rows={rows} />
+                <DataTable stack columns={shown} rows={rows} rowKey={(r) => r.seating_no} caption={t.top.leaderT} empty={t.top.filterNone} />
+                <ExportBar name={`bosla-${year}-top-100`} sheet={t.top.leaderT} columns={shown} rows={rows} />
               </Card>
             </>
           );
@@ -205,12 +205,11 @@ export function Stats() {
   const core = useCore();
   return (
     <div className="page">
-      <PageHead title={t.stats.title} sub={t.stats.sub} badge={<YearBadge />} />
       <Ready of={core}>
-        {({ a }) => {
+        {({ a, year, max }) => {
           const s = a.stats_pct, S = t.stats.s;
           const tiles: [string, string, string?][] = [
-            [S.mean, f(s.mean, 3), "%"], [S.median, f(s.median, 3), "%"], [S.mode, `${n(a.stats_score.mode)} / 320`], [S.std, f(s.std, 3)],
+            [S.mean, f(s.mean, 3), "%"], [S.median, f(s.median, 3), "%"], [S.mode, `${n(a.stats_score.mode)} / ${n(max)}`], [S.std, f(s.std, 3)],
             [S.variance, f(s.variance, 2)], [S.skew, f(s.skewness, 3)], [S.kurt, f(s.kurtosis_excess, 3)], [S.range, f(s.range, 1), "%"],
             [S.iqr, f(s.iqr, 2), "%"], [S.cv, f(s.cv_pct, 2), "%"], [S.sem, f(s.sem, 4)], [S.n, n(s.n)],
           ];
@@ -222,16 +221,18 @@ export function Stats() {
           const tests: [string, typeof N.shapiro_wilk][] = [["Shapiro–Wilk", N.shapiro_wilk], ["D'Agostino K²", N.dagostino_k2], ["Jarque–Bera", N.jarque_bera]];
           const pareto = [...a.grade_bands_sitters].sort((x, y) => y.count - x.count);
           let run = 0;
+          const all = a.clusters.method === "exact";
           return (
             <>
+              <PageHead title={t.stats.title} sub={t.stats.sub} badge={<YearBadge year={year} />} />
               <Card title={t.stats.descT} desc={t.stats.descD}>
                 <div className="grid g4">{tiles.map(([k, v, u]) => <Stat key={k} label={k} value={v} unit={u} />)}</div>
               </Card>
               <div className="grid g2">
                 <Card title={t.stats.pctT} desc={t.stats.pctD}>
-                  <BarList max={100} rows={pk.map((k) => ({ key: k, label: <bdi>P{k}</bdi>, value: a.percentiles_pct[k]!, display: `${f(a.percentiles_pct[k]!, 1)}%`, note: `${f(a.percentiles_score[k]!, 1)} / 320` }))} />
+                  <BarList max={100} rows={pk.map((k) => ({ key: k, label: <bdi>P{k}</bdi>, value: a.percentiles_pct[k]!, display: `${f(a.percentiles_pct[k]!, 1)}%`, note: `${f(a.percentiles_score[k]!, 1)} / ${n(max)}` }))} />
                 </Card>
-                <Card title={t.stats.clT} desc={t.stats.clD(a.clusters.k, compact(a.clusters.sample_n))}>
+                <Card title={t.stats.clT} desc={all ? t.stats.clDAll(String(a.clusters.k), n(a.clusters.sample_n)) : t.stats.clD(String(a.clusters.k), compact(a.clusters.sample_n))}>
                   <BarList rows={cl.map((c) => ({ key: String(c.cluster), label: <span>{t.stats.cluster(c.cluster)} <small className="muted"><bdi>{f(c.min_score, 0)}–{f(c.max_score, 0)}</bdi></small></span>, value: c.share_pct, display: `${f(c.share_pct, 1)}%`, note: `${t.stats.centre} ${f(c.center_pct, 1)}%` }))} />
                 </Card>
               </div>
@@ -298,9 +299,10 @@ export function QualityPage() {
   const q = useQuality();
   return (
     <div className="page">
-      <PageHead title={t.quality.title} sub={t.quality.sub} badge={<YearBadge />} />
+      <PageHead title={t.quality.title} sub={t.quality.sub} />
       <Ready of={q}>
         {(d) => {
+          const rule = t.quality.rule(n(d.meta?.max_score ?? 320));
           const dims: [string, number][] = [[t.quality.completeness, d.dimension_scores.completeness], [t.quality.validity, d.dimension_scores.validity], [t.quality.uniqueness, d.dimension_scores.uniqueness]];
           const sum = [[t.quality.all, d.summary_statistics.total_degree_all], [t.quality.sitters, d.summary_statistics.total_degree_sitters]] as const;
           return (
@@ -337,7 +339,7 @@ export function QualityPage() {
                   <div className="table-wrap">
                     <table className="table">
                       <thead><tr><th scope="col">#</th><th scope="col">{t.quality.rulesT}</th><th scope="col" className="num">{t.quality.flaggedCount}</th></tr></thead>
-                      <tbody>{RULES.map((r, i) => <tr key={r}><td className="num muted">{i + 1}</td><td>{t.quality.rule[r]}</td><td className="num strong">{n(d.invalid.breakdown[r] ?? 0)}</td></tr>)}</tbody>
+                      <tbody>{RULES.map((r, i) => <tr key={r}><td className="num muted">{i + 1}</td><td>{rule[r]}</td><td className="num strong">{n(d.invalid.breakdown[r] ?? 0)}</td></tr>)}</tbody>
                     </table>
                   </div>
                 </Card>

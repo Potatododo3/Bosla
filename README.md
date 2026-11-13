@@ -8,6 +8,57 @@ Everything on the site is recalculated from one results file, so it can be rebui
 
 > Unofficial. Not affiliated with the Ministry of Education or the coordination office.
 
+## What visitors can do
+
+There are no accounts or sign-ups; everything is open to any visitor.
+
+### For students
+
+**Where do I stand?** — type your total (or your percentage) and see:
+
+- your exact national rank among all ranked students
+- your percentile (the share of students you scored at or above)
+- your grade band, and whether you are in the top 1%, 5% or 10%
+- how many students are ahead of you, tied with you, and below you
+- a performance index (50 is the average)
+- your position marked on the score distribution chart
+
+You can copy a one-line summary or print the page. The score is calculated in the browser and is not saved or sent anywhere.
+
+**Admission explorer** — enter your percentage, by typing or with a slider, and compare it with each faculty's official minimum. Each
+faculty is marked "meets the minimum", "within 1 point" or "below", with your margin and a chart showing where you sit.
+
+**Official minimums** — the ministry's published minimum percentage for each faculty, with the total needed, how many students reached
+it, and a link to the official source. Before the ministry publishes, both admission pages say the figures are not out yet and show no numbers.
+
+**Student search** — look up a result by seat number or by name; Arabic spelling variants (أ/ا, ة/ه, ى/ي) are matched automatically.
+Opening a student shows their total, percentage, status, rank and the students ranked just around them. It only works where the site
+owner has connected the results file.
+
+### Analytics
+
+- **Overview** — total students, pass rate, average, how many passed or failed, students per grade band, how many reached each threshold
+  (50% up to 95%), and key takeaways.
+- **Score distribution** — charts showing how totals are spread across the cohort, including how often each exact total occurs.
+- **Top performers** — the top 100 students, filterable by name or seat number, plus the cut-offs for the top 1%, 5% and 10%.
+- **Statistical analysis** — averages, spread, percentiles, score clusters and related statistics, for readers who want the detail.
+- **Data quality** — how complete the results file is and which rows were flagged or excluded from ranking, and why.
+
+### About the site
+
+- **Methodology** — how every number is calculated, in plain steps with the formulas.
+- **FAQ** — short answers on the data, the ranking, the admission minimums and privacy.
+- **About** — what the site is, which year's results are loaded, privacy, and its limits (it is unofficial).
+
+### On every page
+
+- Arabic or English, with the layout switching direction to match.
+- Light, dark or automatic theme.
+- Works on phones and desktops.
+- Tables can be downloaded as CSV or Excel, or printed to PDF.
+- Charts have a "show data table" button for the exact numbers.
+- Clear messages for invalid input, no results, or a connection problem.
+
 ## Run it
 
 ```bash
@@ -197,12 +248,6 @@ public/data/            generated statistics (rebuilt by `npm run build-data`)
 tests/, e2e/            unit tests and browser tests
 docs/                   NEXT-YEAR-PLAN.md — the design notes behind the yearly rebuild
 ```
-
-## Pages
-
-For students: Home · Where do I stand? · Admission explorer · Official minimums · Student search
-Analytics: Overview · Score distribution · Top performers · Statistical analysis · Data quality
-About: Methodology · FAQ · About
 
 ## Accuracy
 
